@@ -45,6 +45,6 @@ I implement "we select k key frames to form the predicted summary video" by [tor
 
 Is the function [torch.index_select(input, dim, index, out=None)](https://pytorch.org/docs/stable/torch.html) differentiable during training?Is this the main problem to cause the training to death?
 
-Please feel free to [contact](pcshih.cs07g@nctu.edu.tw) me or disscuss on issues if you have any suggestions.
+Please feel free to contact me via email (pcshih.cs07g@nctu.edu.tw) or disscuss on issues if you have any suggestions.
 
 I am all gratitude.
