@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
     model = FCSN_ENC()
     model.to(device)
-    model.eval()
+    #model.eval()
 
     inp = torch.randn(1, 1024, 1, 1).to(device)
     out = model(inp)

@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
     model = FCSN(n_class=2)
     model.to(device)
-    model.eval()
+    #model.eval()
     data = torch.randn(1, 1024, 1, 1).to(device) # [1,1024,1,input_frames] 
     out = model(data)
     print(out.shape) #[1,2,1,input_frames]

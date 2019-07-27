@@ -184,26 +184,34 @@ for epoch in range(EPOCH):
         ##############
         S_K.zero_grad()
 
-        S_K_summary,column_mask = S_K(vd)
+        #S_K_summary,column_mask = S_K(vd)
+        S_K_summary,index_mask = S_K(vd)
         output = S_D(S_K_summary)
         label = torch.full((1,), 1, device=device)
 
         # adv. loss
         errS_K = criterion(output, label)
 
-        # reconstruct
-        index = torch.tensor(column_mask, device=device)
-        select_vd = torch.index_select(vd, 3, index)
-        reconstruct_loss = torch.norm(S_K_summary-select_vd, p=2)**2
-        reconstruct_loss /= len(column_mask)
-        
+        ###old reconstruct###
+        # index = torch.tensor(column_mask, device=device)
+        # select_vd = torch.index_select(vd, 3, index)
+        # reconstruct_loss = torch.norm(S_K_summary-select_vd, p=2)**2
+        # reconstruct_loss /= len(column_mask)
+        ###old reconstruct###
+
+        ###new reconstruct###
+        reconstruct_loss = torch.sum((S_K_summary-vd)**2 * index_mask) / torch.sum(index_mask)
+        ###new reconstruct###
+
+
         # diversity
         S_K_summary_reshape = S_K_summary.view(S_K_summary.shape[1], S_K_summary.shape[3])
         norm_div = torch.norm(S_K_summary_reshape, 2, 0, True)
         S_K_summary_reshape = S_K_summary_reshape/norm_div
         loss_matrix = S_K_summary_reshape.transpose(1, 0).mm(S_K_summary_reshape)
         diversity_loss = loss_matrix.sum() - loss_matrix.trace()
-        diversity_loss = diversity_loss/len(column_mask)/(len(column_mask)-1)
+        #diversity_loss = diversity_loss/len(column_mask)/(len(column_mask)-1)
+        diversity_loss = diversity_loss/(torch.sum(index_mask))/(torch.sum(index_mask)-1)
 
         S_K_total_loss = errS_K+reconstruct_loss+diversity_loss # for summe dataset beta=1
         S_K_total_loss.backward()
