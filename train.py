@@ -205,13 +205,14 @@ for epoch in range(EPOCH):
 
 
         # diversity
+        S_K_summary = index_mask*S_K_summary
         S_K_summary_reshape = S_K_summary.view(S_K_summary.shape[1], S_K_summary.shape[3])
         norm_div = torch.norm(S_K_summary_reshape, 2, 0, True)
         S_K_summary_reshape = S_K_summary_reshape/norm_div
         loss_matrix = S_K_summary_reshape.transpose(1, 0).mm(S_K_summary_reshape)
         diversity_loss = loss_matrix.sum() - loss_matrix.trace()
         #diversity_loss = diversity_loss/len(column_mask)/(len(column_mask)-1)
-        diversity_loss = diversity_loss/(index_mask.shape[-1])/(index_mask.shape[-1]-1)
+        diversity_loss = diversity_loss/(torch.sum(index_mask))/(torch.sum(index_mask)-1)
 
         S_K_total_loss = errS_K+reconstruct_loss+diversity_loss # for summe dataset beta=1
         S_K_total_loss.backward()
