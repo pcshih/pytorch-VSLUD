@@ -26,9 +26,10 @@ class SK(nn.Module):
 
         h = self.FCSN(h)
 
-        values, indices = h.max(1, keepdim=True)
+        
 
         ###old###
+        # values, indices = h.max(1, keepdim=True)
         # # 0/1 vector, we only want key(indices=1) frame
         # column_mask = (indices==1).view(-1).nonzero().view(-1).tolist() 
 
@@ -43,13 +44,14 @@ class SK(nn.Module):
         ###old###
 
         ###new###
-        index_mask = (indices==1).type(torch.float32)
+        index_mask = self.sigmoid(h[:,1]-h[:,0]).view(1,1,1,-1)
+        #index_mask = (indices==1).type(torch.float32)
         # if S_K doesn't select more than one element, then random select two element(for the sake of diversity loss)
-        if (len(index_mask.view(-1).nonzero().view(-1).tolist()) < 2):
-            print("S_K does not select anything, give a random mask with 2 elements")
-            index_mask = torch.zeros([1,1,1,h.shape[3]], dtype=torch.float32, device=torch.device('cuda:0'))
-            for idx in random.sample(list(range(h.shape[3])), 2):
-                index_mask[:,:,:,idx] = 1.0
+        # if (len(index_mask.view(-1).nonzero().view(-1).tolist()) < 2):
+        #     print("S_K does not select anything, give a random mask with 2 elements")
+        #     index_mask = torch.zeros([1,1,1,h.shape[3]], dtype=torch.float32, device=torch.device('cuda:0'))
+        #     for idx in random.sample(list(range(h.shape[3])), 2):
+        #         index_mask[:,:,:,idx] = 1.0
 
         h_select = h*index_mask
         x_select = x_temp*index_mask
