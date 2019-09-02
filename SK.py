@@ -18,15 +18,18 @@ class SK(nn.Module):
         self.relu_summary = nn.ReLU(inplace=True)#nn.RReLU()
         self.tanh_summary = nn.Tanh()
         self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.Softmax(dim=1)
+
+        self.conv_reconstuct2 = nn.Conv2d(1024, 1024, (1,1))
+        self.bn_reconstruct2 = nn.BatchNorm2d(1024)
+        self.relu_reconstuct2 = nn.ReLU(inplace=True)
 
 
     def forward(self, x):
-        h = x
-        x_temp = x
+        h = x   # [1,1024,1,T]
+        x_temp = x  # [1,1024,1,T]
 
-        h = self.FCSN(h)
-
-        
+        h = self.FCSN(h); print(h) # [1,2,1,T]
 
         ###old###
         # values, indices = h.max(1, keepdim=True)
@@ -44,7 +47,10 @@ class SK(nn.Module):
         ###old###
 
         ###new###
-        index_mask = self.sigmoid(h[:,1]-h[:,0]).view(1,1,1,-1)
+        #index_mask = self.sigmoid(h[:,1]-h[:,0]).view(1,1,1,-1)
+        h_softmax = self.softmax(h*100) # [1,2,1,T]
+        index_mask = h_softmax[:,1,:].view(1,1,1,-1)
+        #index_mask = self.sigmoid(h[:,1]-h[:,0]).view(1,1,1,-1)
         #index_mask = (indices==1).type(torch.float32)
         # if S_K doesn't select more than one element, then random select two element(for the sake of diversity loss)
         # if (len(index_mask.view(-1).nonzero().view(-1).tolist()) < 2):
@@ -63,7 +69,9 @@ class SK(nn.Module):
 
         summary = x_select+h_select
 
-        summary = self.relu_summary(summary)
+        summary = self.relu_reconstuct2(self.bn_reconstruct2(self.conv_reconstuct2(summary))) # [5,1024,1,320]
+
+        #summary = self.relu_summary(summary)
         
         #return summary,column_mask
         return summary,index_mask         
@@ -75,7 +83,7 @@ if __name__ == '__main__':
     model = SK()
     #model.eval()
     model.to(device)
-    inp = torch.randn(1, 1024, 1, 5).to(device)
+    inp = torch.randn(1, 1024, 1, 5, requires_grad=True).to(device)
 
     summary,mask = model(inp)
     print(summary.shape)

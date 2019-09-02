@@ -158,7 +158,7 @@ class FCSN(nn.Module):
         h = upscore2+score_pool4c
         # deconv2
         h = self.upscore16(h)
-        h = h[:, :, :, 27:27+x.size()[3]].contiguous()
+        h = h[:, :, :, 27:27+x.size()[3]]
 
         return h
 
@@ -168,7 +168,13 @@ if __name__ == '__main__':
     model = FCSN(n_class=2)
     model.to(device)
     #model.eval()
-    data = torch.randn(1, 1024, 1, 1).to(device) # [1,1024,1,input_frames] 
+    data = torch.randn(1, 1024, 1, 5, requires_grad=True).to(device) # [1,1024,1,input_frames] 
     out = model(data)
     print(out.shape) #[1,2,1,input_frames]
+    print(out)
+    softmax = nn.Softmax(dim=1)
+    softmax_out = softmax(out*100) 
+    print(softmax_out)
+    print(softmax_out[:,1,:])
+    print(softmax_out[:,1,:]*out)
     

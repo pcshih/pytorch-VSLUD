@@ -14,8 +14,8 @@ random.seed(time.time())
 
 
 print("loading training data...")
-video = torch.load("datasets/reorganized_training_dataset_summe_video.tar")
-summary = torch.load("datasets/reorganized_training_dataset_summe_summary.tar")
+video = torch.load("datasets/video_frame_pool5.tar")
+summary = torch.load("datasets/summary_frame_pool5.tar")
 print("loading training data ended")
 
 PATH_record = "loss_record.tar"
@@ -233,7 +233,7 @@ for epoch in range(EPOCH):
 
         # fake summary #
         S_K_summary,_ = S_K(vd)
-        output = S_D(S_K_summary.detach())
+        output = S_D(S_K_summary.detach()); #print(S_K_summary)
         label.fill_(0)
         err_S_D_fake = criterion(output, label)
         err_S_D_fake.backward()
@@ -253,33 +253,33 @@ for epoch in range(EPOCH):
 
         iteration = len(time_list)-1
         
-        if ((iteration+1)%(79*5)==0): # save every 5 epoch
-            PATH_model_save = "{}{}{:0>7d}{}".format(PATH_model, "/iter_", iteration, ".tar")
-            S_K_state_dict = S_K.state_dict()
-            optimizerS_K_state_dict = optimizerS_K.state_dict()
-            S_D_state_dict = S_D.state_dict()
-            optimizerS_D_state_dict = optimizerS_D.state_dict()
+        # if ((iteration+1)%(150*5)==0): # save every 5 epoch
+        #     PATH_model_save = "{}{}{:0>7d}{}".format(PATH_model, "/iter_", iteration, ".tar")
+        #     S_K_state_dict = S_K.state_dict()
+        #     optimizerS_K_state_dict = optimizerS_K.state_dict()
+        #     S_D_state_dict = S_D.state_dict()
+        #     optimizerS_D_state_dict = optimizerS_D.state_dict()
 
-            torch.save({
-                    "S_K_state_dict": S_K_state_dict,
-                    "optimizerS_K_state_dict": optimizerS_K_state_dict,
-                    "S_D_state_dict": S_D_state_dict,
-                    "optimizerS_D_state_dict":  optimizerS_D_state_dict
-                    }, PATH_model_save)
+        #     torch.save({
+        #             "S_K_state_dict": S_K_state_dict,
+        #             "optimizerS_K_state_dict": optimizerS_K_state_dict,
+        #             "S_D_state_dict": S_D_state_dict,
+        #             "optimizerS_D_state_dict":  optimizerS_D_state_dict
+        #             }, PATH_model_save)
 
-            print("model is saved in {}".format(PATH_model_save))
+        #     print("model is saved in {}".format(PATH_model_save))
 
-            torch.save({
-                    "S_K_iter_loss_list": S_K_iter_loss_list,
-                    "reconstruct_iter_loss_list": reconstruct_iter_loss_list,
-                    "diversity_iter_loss_list": diversity_iter_loss_list,
-                    "S_D_real_iter_loss_list": S_D_real_iter_loss_list,
-                    "S_D_fake_iter_loss_list": S_D_fake_iter_loss_list,
-                    "S_D_total_iter_loss_list": S_D_total_iter_loss_list,
-                    "time_list": time_list
-                    }, PATH_record)
+        #     torch.save({
+        #             "S_K_iter_loss_list": S_K_iter_loss_list,
+        #             "reconstruct_iter_loss_list": reconstruct_iter_loss_list,
+        #             "diversity_iter_loss_list": diversity_iter_loss_list,
+        #             "S_D_real_iter_loss_list": S_D_real_iter_loss_list,
+        #             "S_D_fake_iter_loss_list": S_D_fake_iter_loss_list,
+        #             "S_D_total_iter_loss_list": S_D_total_iter_loss_list,
+        #             "time_list": time_list
+        #             }, PATH_record)
 
-            print("loss record is saved in {}".format(PATH_record))
+        #     print("loss record is saved in {}".format(PATH_record))
         
 
         # send to tensorboard
