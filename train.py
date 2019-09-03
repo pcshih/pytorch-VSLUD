@@ -24,9 +24,9 @@ PATH_model = "saved_models"
 EPOCH = 700
 
 # reconstruction error coefficient
-reconstruction_error_coeff = 0.0005
+reconstruction_error_coeff = 0.001
 # diversity error coefficient
-diversity_error_coeff = 1.5
+diversity_error_coeff = 1.0
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -105,8 +105,16 @@ S_K = SK().to(device)
 S_D = SD().to(device)
 
 
-optimizerS_K = optim.Adam(S_K.parameters(), lr=0.00001)
-optimizerS_D = optim.SGD(S_D.parameters(), lr=0.00004)
+optimizerS_K = optim.Adam(S_K.parameters(), lr=0.000001)
+optimizerS_D = optim.SGD(S_D.parameters(), lr=0.000004)
+
+# Assuming optimizer uses lr = 0.05 for all groups
+#example
+# lr = 0.05     if epoch < 30
+# lr = 0.005    if 30 <= epoch < 60
+# lr = 0.0005   if 60 <= epoch < 90
+scheduler_S_K = optim.lr_scheduler.StepLR(optimizerS_K, step_size=10, gamma=0.5)
+scheduler_S_D = optim.lr_scheduler.StepLR(optimizerS_D, step_size=10, gamma=0.5)
 
 
 # configure training record
@@ -176,6 +184,10 @@ for epoch in range(EPOCH):
     random.shuffle(video["feature"])
     random.shuffle(summary["feature"])
 
+    # decay lr
+    scheduler_S_K.step()
+    scheduler_S_D.step()
+
 
     tqdm_range = tqdm.trange(len(video["feature"]))
     for i in tqdm_range: # video["feature"] -> [[1,1024,1,A], [1,1024,1,B]...]
@@ -226,38 +238,38 @@ for epoch in range(EPOCH):
         feature = vd.view(1,1024,-1) # [1,1024,1,T] -> [1,1024,T] 
 
         # reconst. loss改成分批再做平均
-        feature_select = feature*mask
-        outputs_reconstruct_select = outputs_reconstruct*mask
-        feature_diff_1 = torch.sum((feature_select-outputs_reconstruct_select)**2, dim=1)
-        feature_diff_1 = torch.sum(feature_diff_1, dim=1)
+        feature_select = feature*mask # [1,1024,T]
+        outputs_reconstruct_select = outputs_reconstruct*mask # [1,1024,T]
+        feature_diff_1 = torch.sum((feature_select-outputs_reconstruct_select)**2, dim=1) # [1,T]
+        feature_diff_1 = torch.sum(feature_diff_1, dim=1) # [1]
 
-        mask_sum = torch.sum(mask, dim=2)
-        mask_sum = torch.sum(mask_sum, dim=1)
+        mask_sum = torch.sum(mask, dim=2) # [1,1]
+        mask_sum = torch.sum(mask_sum, dim=1) # [1]
 
-        reconstruct_loss = torch.mean(feature_diff_1/mask_sum)
+        reconstruct_loss = torch.mean(feature_diff_1/mask_sum) # scalar
         
 
         # diversity loss
-        batch_size, feat_size, frames = outputs_reconstruct.shape
+        batch_size, feat_size, frames = outputs_reconstruct.shape # [1,1024,T]
 
-        outputs_reconstruct_norm = torch.norm(outputs_reconstruct, p=2, dim=1, keepdim=True)
+        outputs_reconstruct_norm = torch.norm(outputs_reconstruct, p=2, dim=1, keepdim=True) # [1,1,T]
 
-        normalized_outputs_reconstruct = outputs_reconstruct/outputs_reconstruct_norm
+        normalized_outputs_reconstruct = outputs_reconstruct/outputs_reconstruct_norm # [1,1024,T]
 
-        normalized_outputs_reconstruct_reshape = normalized_outputs_reconstruct.permute(0, 2, 1)
+        normalized_outputs_reconstruct_reshape = normalized_outputs_reconstruct.permute(0, 2, 1) # [1,T,1024]
 
-        similarity_matrix = torch.bmm(normalized_outputs_reconstruct_reshape, normalized_outputs_reconstruct)
+        similarity_matrix = torch.bmm(normalized_outputs_reconstruct_reshape, normalized_outputs_reconstruct) # [1,T,T]
 
-        mask_trans = mask.permute(0,2,1)
-        mask_matrix = torch.bmm(mask_trans, mask)
+        mask_trans = mask.permute(0,2,1) # [1,T,1]
+        mask_matrix = torch.bmm(mask_trans, mask) # [1,T,T]
         # filter out non key
-        similarity_matrix_filtered = similarity_matrix*mask_matrix
+        similarity_matrix_filtered = similarity_matrix*mask_matrix # [1,T,T]
 
         diversity_loss = 0
         acc_batch_size = 0
         for j in range(batch_size):
-            batch_similarity_matrix_filtered = similarity_matrix_filtered[j,:,:]
-            batch_mask = mask[j,:,:]
+            batch_similarity_matrix_filtered = similarity_matrix_filtered[j,:,:] # [T,T]
+            batch_mask = mask[j,:,:] # [T,T]
             if batch_mask.sum() < 2:
                 #print("select less than 2 frames", batch_mask.sum())
                 batch_diversity_loss = 0
@@ -284,6 +296,8 @@ for epoch in range(EPOCH):
         ##############
         # update S_D #
         ##############
+        # update every 5 epoch
+        #if((epoch+1)%5==0):
         S_D.zero_grad()
 
         # real summary #
@@ -302,6 +316,10 @@ for epoch in range(EPOCH):
         S_D_total_loss = err_S_D_real+err_S_D_fake
 
         optimizerS_D.step()
+        # else:
+        #     err_S_D_real = -1.0
+        #     err_S_D_fake = -1.0
+        #     S_D_total_loss = err_S_D_real+err_S_D_fake
         
         # record
         time_list.append(time.time())

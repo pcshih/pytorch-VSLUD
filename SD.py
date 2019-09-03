@@ -30,10 +30,21 @@ class SD(nn.Module):
 if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = SD()
-    model.to(device)
+    #model = SD()
+    #model.to(device)
     #model.eval()
 
-    inp = torch.randn(1, 1024, 1, 1).to(device)
-    out = model(inp)
-    print(out.shape)
+    inp = torch.randn(1, 3, 1, 2, requires_grad=True).to(device); print(inp)
+    mask = torch.randn(1, 1, 1, 2).to(device); print(mask)
+
+    inp_view = inp.view(1,3,2); print(inp_view)
+    mask_view = mask.view(1,1,2); print(mask_view)
+
+    print(inp_view*mask_view)
+
+    scalar = torch.randn(1); print(scalar)
+    print(torch.mean(scalar))
+
+
+    #out = model(inp)
+    #print(out.shape)
