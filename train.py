@@ -7,8 +7,8 @@ from tensorboardX import SummaryWriter
 import time
 import tqdm
 import random
-from SK import SK
-from SD import SD
+from SK import *
+from SD import *
 
 random.seed(time.time())
 
@@ -18,15 +18,15 @@ video = torch.load("datasets/video_frame_pool5.tar")
 summary = torch.load("datasets/summary_frame_pool5.tar")
 print("loading training data ended")
 
-PATH_record = "loss_record.tar"
+PATH_record = "saved_models/loss_record_3.tar"
 PATH_model = "saved_models"
 
-EPOCH = 700
+EPOCH = 1000
 
 # reconstruction error coefficient
-reconstruction_error_coeff = 0.001
+reconstruction_error_coeff = 0.5
 # diversity error coefficient
-diversity_error_coeff = 1.0
+diversity_error_coeff = 0.0
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -101,20 +101,20 @@ def weights_init(m):
                 init.normal_(param.data)
 
 
-S_K = SK().to(device)
-S_D = SD().to(device)
+S_K = SK_test().to(device)
+S_D = SD_test().to(device)
 
 
-optimizerS_K = optim.Adam(S_K.parameters(), lr=0.000001)
-optimizerS_D = optim.SGD(S_D.parameters(), lr=0.000004)
+optimizerS_K = optim.Adam(S_K.parameters(), lr=1e-5)
+optimizerS_D = optim.SGD(S_D.parameters(), lr=2e-5)
 
 # Assuming optimizer uses lr = 0.05 for all groups
 #example
 # lr = 0.05     if epoch < 30
 # lr = 0.005    if 30 <= epoch < 60
 # lr = 0.0005   if 60 <= epoch < 90
-scheduler_S_K = optim.lr_scheduler.StepLR(optimizerS_K, step_size=10, gamma=0.5)
-scheduler_S_D = optim.lr_scheduler.StepLR(optimizerS_D, step_size=10, gamma=0.5)
+scheduler_S_K = optim.lr_scheduler.StepLR(optimizerS_K, step_size=20, gamma=0.8)
+scheduler_S_D = optim.lr_scheduler.StepLR(optimizerS_D, step_size=20, gamma=0.8)
 
 
 # configure training record
@@ -136,8 +136,8 @@ if mode==0:
     S_D_fake_iter_loss_list = []
     S_D_total_iter_loss_list = []
     
-    #S_K.apply(weights_init)
-    #S_D.apply(weights_init)
+    S_K.apply(weights_init)
+    S_D.apply(weights_init)
     S_K.train()
     S_D.train()
 elif mode==1:
@@ -237,6 +237,8 @@ for epoch in range(EPOCH):
         mask = index_mask.view(1,1,-1) # [1,1,1,T] -> [1,1,T] 
         feature = vd.view(1,1024,-1) # [1,1024,1,T] -> [1,1024,T] 
 
+        #print(i, mask.view(-1))
+
         # reconst. loss改成分批再做平均
         feature_select = feature*mask # [1,1024,T]
         outputs_reconstruct_select = outputs_reconstruct*mask # [1,1024,T]
@@ -286,9 +288,20 @@ for epoch in range(EPOCH):
             diversity_loss = 0
 
 
+        # sparsity loss
+        # sigma = 0.3
+        # mask_mean = torch.mean(mask, dim=2) # [1,1]
+        # mask_mean = torch.sum(mask_mean, dim=1) # [1]
+        # sigma_vector =  torch.ones([batch_size], device=device)*sigma # [1]
+        # sparsity_loss = torch.mean((sigma_vector-mask_mean)**2)
+
         S_K_total_loss = errS_K + reconstruction_error_coeff*reconstruct_loss + diversity_error_coeff*diversity_loss # for summe dataset beta=1
         #S_K_total_loss = errS_K+reconstruct_loss
         S_K_total_loss.backward()
+
+        # print grad
+        #print("weight grad:", S_K.inc.conv.conv[0].weight.grad)
+
 
         # update
         optimizerS_K.step()
@@ -315,6 +328,9 @@ for epoch in range(EPOCH):
 
         S_D_total_loss = err_S_D_real+err_S_D_fake
 
+        # print grad
+        #print("weight grad:", S_D.inc.conv.conv[0].weight.grad)
+
         optimizerS_D.step()
         # else:
         #     err_S_D_real = -1.0
@@ -332,36 +348,38 @@ for epoch in range(EPOCH):
 
         iteration = len(time_list)-1
         
-        # if ((iteration+1)%(150*5)==0): # save every 5 epoch
-        #     PATH_model_save = "{}{}{:0>7d}{}".format(PATH_model, "/iter_", iteration, ".tar")
-        #     S_K_state_dict = S_K.state_dict()
-        #     optimizerS_K_state_dict = optimizerS_K.state_dict()
-        #     S_D_state_dict = S_D.state_dict()
-        #     optimizerS_D_state_dict = optimizerS_D.state_dict()
+        if ((iteration+1)%(150*50)==0): # save every 50 epoch
+            PATH_model_save = "{}{}{:0>7d}{}".format(PATH_model, "/iter_", iteration, "_3.tar")
+            S_K_state_dict = S_K.state_dict()
+            optimizerS_K_state_dict = optimizerS_K.state_dict()
+            S_D_state_dict = S_D.state_dict()
+            optimizerS_D_state_dict = optimizerS_D.state_dict()
 
-        #     torch.save({
-        #             "S_K_state_dict": S_K_state_dict,
-        #             "optimizerS_K_state_dict": optimizerS_K_state_dict,
-        #             "S_D_state_dict": S_D_state_dict,
-        #             "optimizerS_D_state_dict":  optimizerS_D_state_dict
-        #             }, PATH_model_save)
+            torch.save({
+                    "S_K_state_dict": S_K_state_dict,
+                    "optimizerS_K_state_dict": optimizerS_K_state_dict,
+                    "S_D_state_dict": S_D_state_dict,
+                    "optimizerS_D_state_dict":  optimizerS_D_state_dict
+                    }, PATH_model_save)
 
-        #     print("model is saved in {}".format(PATH_model_save))
+            print("model is saved in {}".format(PATH_model_save))
 
-        #     torch.save({
-        #             "S_K_iter_loss_list": S_K_iter_loss_list,
-        #             "reconstruct_iter_loss_list": reconstruct_iter_loss_list,
-        #             "diversity_iter_loss_list": diversity_iter_loss_list,
-        #             "S_D_real_iter_loss_list": S_D_real_iter_loss_list,
-        #             "S_D_fake_iter_loss_list": S_D_fake_iter_loss_list,
-        #             "S_D_total_iter_loss_list": S_D_total_iter_loss_list,
-        #             "time_list": time_list
-        #             }, PATH_record)
+            torch.save({
+                    "S_K_iter_loss_list": S_K_iter_loss_list,
+                    "reconstruct_iter_loss_list": reconstruct_iter_loss_list,
+                    "diversity_iter_loss_list": diversity_iter_loss_list,
+                    "S_D_real_iter_loss_list": S_D_real_iter_loss_list,
+                    "S_D_fake_iter_loss_list": S_D_fake_iter_loss_list,
+                    "S_D_total_iter_loss_list": S_D_total_iter_loss_list,
+                    "time_list": time_list
+                    }, PATH_record)
 
-        #     print("loss record is saved in {}".format(PATH_record))
+            print("loss record is saved in {}".format(PATH_record))
+
+            print("key frame prob", mask.view(-1))
         
 
-        # send to tensorboard
+        # # send to tensorboard
         writer.add_scalar("loss/S_K", S_K_iter_loss_list[iteration], iteration, time_list[iteration])   # tag, Y, X -> 當Y只有一個時
         writer.add_scalar("loss/reconstruction", reconstruct_iter_loss_list[iteration], iteration, time_list[iteration]) 
         writer.add_scalar("loss/diversity", diversity_iter_loss_list[iteration], iteration, time_list[iteration]) 
